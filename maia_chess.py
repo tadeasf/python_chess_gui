@@ -4,6 +4,7 @@ import pygame
 import chess
 import chess.engine
 import warnings
+import math
 
 # Initialize Pygame
 pygame.init()
@@ -11,11 +12,12 @@ pygame.init()
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.image")
 
 # Set up the display
-WIDTH, HEIGHT = 1200, 900  # Increased width for move suggestions
-SQ_SIZE = WIDTH // 15  # Adjusted for new width
+WIDTH, HEIGHT = 800, 1000  # Adjusted the width and height as per requirements
+SQ_SIZE = WIDTH // 8  # Square size for the chessboard
 BOARD_SIZE = 8 * SQ_SIZE
+INFO_HEIGHT = HEIGHT - BOARD_SIZE
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Chess GUI")
+pygame.display.set_caption("Fořtí Chess Engine")
 
 
 # Determine the resource path
@@ -31,7 +33,7 @@ def resource_path(relative_path):
 IMAGES = {}
 PIECES = ["wP", "bP", "wN", "bN", "wB", "bB", "wR", "bR", "wQ", "bQ", "wK", "bK"]
 for piece in PIECES:
-    image = pygame.image.load(resource_path(f"images/{piece}.png"))
+    image = pygame.image.load(resource_path(f"assets/images/{piece}.png"))
     IMAGES[piece] = pygame.transform.smoothscale(image, (SQ_SIZE, SQ_SIZE))
 
 # Piece to image mapping
@@ -63,7 +65,7 @@ SELECTED_SQUARE_COLOR = pygame.Color(255, 0, 0, 128)  # Semi-transparent Red
 
 # Draw the board
 def draw_board():
-    colors = [pygame.Color(118, 150, 86), pygame.Color(238, 238, 210)]
+    colors = [pygame.Color(150, 150, 150), pygame.Color(120, 120, 120)]
     for r in range(8):
         for c in range(8):
             color = colors[(r + c) % 2]
@@ -90,9 +92,6 @@ def highlight_selected_square(window, selected_square):
             chess.square_file(selected_square),
             7 - chess.square_rank(selected_square),  # Invert y-coordinate here
         )
-        print(
-            f"Highlighting selected square {chess.square_name(selected_square)} at ({x}, {y})"
-        )
         pygame.draw.rect(
             window,
             SELECTED_SQUARE_COLOR,
@@ -116,9 +115,9 @@ def highlight_legal_moves(window, board, selected_square):
                 )
 
 
-# Draw an arrow from the starting square to the ending square
 def draw_move_arrow(window, from_square, to_square, color=ARROW_COLOR):
     if from_square is not None and to_square is not None:
+        # Calculate start and end positions
         start_pos = (
             chess.square_file(from_square) * SQ_SIZE + SQ_SIZE // 2,
             (7 - chess.square_rank(from_square)) * SQ_SIZE + SQ_SIZE // 2,
@@ -127,7 +126,44 @@ def draw_move_arrow(window, from_square, to_square, color=ARROW_COLOR):
             chess.square_file(to_square) * SQ_SIZE + SQ_SIZE // 2,
             (7 - chess.square_rank(to_square)) * SQ_SIZE + SQ_SIZE // 2,
         )
+
+        # Draw the main line of the arrow
         pygame.draw.line(window, color, start_pos, end_pos, 5)
+
+        # Calculate the direction of the arrow
+        direction = (end_pos[0] - start_pos[0], end_pos[1] - start_pos[1])
+        length = math.hypot(*direction)
+        if length == 0:
+            return  # Prevent division by zero if start and end positions are the same
+
+        unit_direction = (direction[0] / length, direction[1] / length)
+
+        # Determine the size of the arrowhead
+        arrow_size = 20  # Increased arrowhead size for more pronounced tip
+        arrow_width = 15  # Increased arrowhead width for more pronounced tip
+
+        # Calculate the first point of the arrowhead
+        left = (
+            end_pos[0]
+            - unit_direction[0] * arrow_size
+            + unit_direction[1] * arrow_width,
+            end_pos[1]
+            - unit_direction[1] * arrow_size
+            - unit_direction[0] * arrow_width,
+        )
+
+        # Calculate the second point of the arrowhead
+        right = (
+            end_pos[0]
+            - unit_direction[0] * arrow_size
+            - unit_direction[1] * arrow_width,
+            end_pos[1]
+            - unit_direction[1] * arrow_size
+            + unit_direction[0] * arrow_width,
+        )
+
+        # Draw the arrowhead
+        pygame.draw.polygon(window, color, [end_pos, left, right])
 
 
 # Draw arrows for best moves
@@ -141,54 +177,34 @@ def draw_arrows(window, best_moves):
 # Handle user input
 def get_square_under_mouse():
     mouse_pos = pygame.mouse.get_pos()
-
-    # Hardcoded a1 square detection
-    if 0 <= mouse_pos[0] < SQ_SIZE and (HEIGHT - SQ_SIZE) <= mouse_pos[1] < HEIGHT:
-        print(f"Clicked on a1 (Mouse position: {mouse_pos})")
-        return chess.square(0, 7)  # Return the square at (0, 7) for a1
-
-    # Normal square detection for other squares
     x, y = [int(v // SQ_SIZE) for v in mouse_pos]
     flipped_y = 7 - y
-    print(f"Mouse position: {mouse_pos}")  # Add debug output
-    print(f"Calculated coordinates: {x}, {flipped_y}")  # Debug output
     if 0 <= x < 8 and 0 <= flipped_y < 8:
-        square = chess.square(x, flipped_y)
-        print(f"Calculated square: {chess.square_name(square)}")  # Debug output
-        return square
-
+        return chess.square(x, flipped_y)
     return None
 
 
 def set_engine_parameters(engine, elo_rating):
-    # Determine the Maia model to use based on the selected Elo rating
     if elo_rating < 1100 or elo_rating > 1900 or elo_rating % 100 != 0:
         raise ValueError(
             "Invalid Elo rating. Please choose a rating between 1100 and 1900 in increments of 100."
         )
-
     weights = f"maia-{elo_rating}.pb.gz"
-
-    # Set up the engine with the selected weights
     engine.quit()
-    engine = chess.engine.SimpleEngine.popen_uci(
-        [
-            "lc0",
-            f"--weights=/Volumes/nvme/PROJECTS/coding_projects/python_chess_gui/{weights}",
-        ]
-    )
-    # Send the command to limit nodes to 1
+    engine = chess.engine.SimpleEngine.popen_uci(["lc0", f"--weights={weights}"])
     engine.configure({"Threads": 1})
     return engine
 
 
 def display_best_moves_text(best_moves):
-    font = pygame.font.Font(None, 24)
-    text_y = 10  # Start below the board
+    font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
+    text_y = BOARD_SIZE + 20  # Start below the board
+    text_x = WIDTH // 2  # Start in the center of the bottom area
     for idx, (move, score) in enumerate(best_moves):
         move_text = f"{idx+1}. {move.uci()} ({score:.2f})"
         text_surface = font.render(move_text, True, pygame.Color(0, 0, 0))
-        WINDOW.blit(text_surface, (BOARD_SIZE + 10, text_y))
+        text_rect = text_surface.get_rect(center=(text_x, text_y))
+        WINDOW.blit(text_surface, text_rect)
         text_y += 30
 
 
@@ -204,7 +220,7 @@ def get_best_moves(engine, board, num_moves=3):
 
 def elo_menu(window, current_elo):
     menu_running = True
-    font = pygame.font.Font(None, 36)
+    font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 36)
     button_width = 100
     button_height = 50
     button_spacing = 20
@@ -258,16 +274,18 @@ def main():
     move_history = []
 
     # Initialize the Maia engine with the default Elo rating
-    engine = chess.engine.SimpleEngine.popen_uci(
-        [
-            "lc0",
-            "--weights=/Volumes/nvme/PROJECTS/coding_projects/python_chess_gui/maia-1500.pb.gz",
-        ]
-    )
-    # Send the command to limit nodes to 1
+    engine = chess.engine.SimpleEngine.popen_uci(["lc0", "--weights=maia-1500.pb.gz"])
     engine.configure({"Threads": 1})
 
     best_moves = get_best_moves(engine, board)
+
+    input_box = pygame.Rect(WIDTH // 2 - 75, HEIGHT - INFO_HEIGHT + 70, 150, 30)
+    color_inactive = pygame.Color("lightskyblue3")
+    color_active = pygame.Color("dodgerblue2")
+    color = color_inactive
+    active = False
+    text = ""
+    font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
 
     def redraw_all():
         draw_board()
@@ -280,28 +298,81 @@ def main():
         pygame.draw.rect(
             WINDOW,
             pygame.Color(200, 200, 200),
-            pygame.Rect(BOARD_SIZE, 0, WIDTH - BOARD_SIZE, HEIGHT),
+            pygame.Rect(0, BOARD_SIZE, WIDTH, INFO_HEIGHT),
         )  # Clear the area for best moves
+        pygame.draw.rect(
+            WINDOW,
+            pygame.Color(0, 0, 0),
+            pygame.Rect(0, BOARD_SIZE, WIDTH, INFO_HEIGHT),
+            3,
+        )  # Black border around the bottom area
         display_best_moves_text(best_moves)
         draw_undo_button()
         draw_restart_button()
+        draw_input_box()
+        draw_make_move_button()
         pygame.display.update()
 
     def draw_undo_button():
-        undo_button = pygame.Rect(BOARD_SIZE + 10, HEIGHT - 60, 120, 40)
+        undo_button = pygame.Rect(10, HEIGHT - INFO_HEIGHT + 10, 175, 60)
         pygame.draw.rect(WINDOW, pygame.Color(255, 0, 0), undo_button)
-        font = pygame.font.Font(None, 36)
+        font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 36)
         text_surface = font.render("Undo Move", True, pygame.Color(255, 255, 255))
-        WINDOW.blit(text_surface, (BOARD_SIZE + 20, HEIGHT - 50))
+        WINDOW.blit(text_surface, (undo_button.x + 5, undo_button.y + 5))
         return undo_button
 
     def draw_restart_button():
-        restart_button = pygame.Rect(BOARD_SIZE + 150, HEIGHT - 60, 120, 40)
+        restart_button = pygame.Rect(WIDTH - 170, HEIGHT - INFO_HEIGHT + 10, 150, 60)
         pygame.draw.rect(WINDOW, pygame.Color(0, 0, 255), restart_button)
-        font = pygame.font.Font(None, 36)
+        font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 36)
         text_surface = font.render("Restart", True, pygame.Color(255, 255, 255))
-        WINDOW.blit(text_surface, (BOARD_SIZE + 160, HEIGHT - 50))
+        WINDOW.blit(text_surface, (restart_button.x + 5, restart_button.y + 5))
         return restart_button
+
+    def draw_input_box():
+        pygame.draw.rect(WINDOW, color, input_box, 2)
+        text_surface = font.render(text, True, color)
+        WINDOW.blit(text_surface, (input_box.x + 5, input_box.y + 5))
+        input_box.w = max(150, text_surface.get_width() + 5)
+
+    def draw_make_move_button():
+        make_move_button = pygame.Rect(
+            WIDTH // 2 - 75, HEIGHT - INFO_HEIGHT + 110, 150, 40
+        )
+        pygame.draw.rect(WINDOW, pygame.Color(0, 128, 0), make_move_button)
+        font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
+        text_surface = font.render("Make Move", True, pygame.Color(255, 255, 255))
+        WINDOW.blit(text_surface, (make_move_button.x + 20, make_move_button.y + 5))
+        return make_move_button
+
+    def handle_text_input(event):
+        nonlocal text, active, color
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if input_box.collidepoint(event.pos):
+                active = not active
+            else:
+                active = False
+            color = color_active if active else color_inactive
+        if event.type == pygame.KEYDOWN:
+            if active:
+                if event.key == pygame.K_RETURN:
+                    return text
+                elif event.key == pygame.K_BACKSPACE:
+                    text = text[:-1]
+                else:
+                    text += event.unicode
+        return None
+
+    def make_move_from_input(move_text):
+        try:
+            move = chess.Move.from_uci(move_text)
+            if move in board.legal_moves:
+                board.push(move)
+                move_history.append(move)
+                return True
+        except Exception:
+            return False
+        return False
 
     # Initial drawing
     redraw_all()
@@ -334,6 +405,12 @@ def main():
                     last_move = None
                     best_moves = get_best_moves(engine, board)
                     redraw_all()
+                elif draw_make_move_button().collidepoint(event.pos):
+                    if make_move_from_input(text):
+                        last_move = move_history[-1] if move_history else None
+                        best_moves = get_best_moves(engine, board)
+                        text = ""
+                        redraw_all()
                 else:
                     square = get_square_under_mouse()
                     if square:
@@ -343,7 +420,6 @@ def main():
                         else:
                             player_clicks.append(square)
                             move = chess.Move(player_clicks[0], player_clicks[1])
-                            print(f"Attempting move: {move}")  # Debug output
                             if move in board.legal_moves:
                                 board.push(move)
                                 move_history.append(move)
@@ -356,15 +432,15 @@ def main():
                                 player_clicks = [square]
                                 selected_square = square
 
-                        if selected_square is not None:
-                            print(
-                                f"Selected square set to: {chess.square_name(selected_square)}"
-                            )
-                        else:
-                            print("Selected square set to: None")
+            input_move = handle_text_input(event)
+            if input_move:
+                if make_move_from_input(input_move):
+                    last_move = move_history[-1] if move_history else None
+                    best_moves = get_best_moves(engine, board)
+                    text = ""
+                    redraw_all()
 
         if not show_menu:
-            # Redraw the specific parts of the screen as needed
             redraw_all()
 
         clock.tick(30)
