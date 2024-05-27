@@ -277,6 +277,35 @@ def elo_menu(window, current_elo):
     return current_elo  # If menu is exited without selection, return current ELO
 
 
+def evaluate_position(engine, board):
+    info = engine.analyse(board, chess.engine.Limit(time=0.1))
+    score = info["score"].relative.score(mate_score=10000)
+    if score is None:
+        return 0.5, 0.5, 0.0  # In case of an unknown score
+    win_prob = 1 / (1 + math.exp(-score / 400))
+    loss_prob = 1 - win_prob
+    draw_prob = 0.0  # For simplicity, you can refine this if needed
+    return win_prob, draw_prob, loss_prob
+
+
+def draw_probabilities(win_prob, draw_prob, loss_prob):
+    font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
+    text_y = HEIGHT - INFO_HEIGHT + 200
+    text_x = WIDTH - 250
+
+    win_text = f"Win: {win_prob:.2%}"
+    draw_text = f"Draw: {draw_prob:.2%}"
+    loss_text = f"Lose: {loss_prob:.2%}"
+
+    win_surface = font.render(win_text, True, pygame.Color(0, 0, 0))
+    draw_surface = font.render(draw_text, True, pygame.Color(0, 0, 0))
+    loss_surface = font.render(loss_text, True, pygame.Color(0, 0, 0))
+
+    WINDOW.blit(win_surface, (text_x, text_y))
+    WINDOW.blit(draw_surface, (text_x, text_y + 30))
+    WINDOW.blit(loss_surface, (text_x, text_y + 60))
+
+
 def main():
     board = chess.Board()
     clock = pygame.time.Clock()
@@ -292,7 +321,11 @@ def main():
 
     # Initialize the Maia engine with the default Elo rating
     engine = chess.engine.SimpleEngine.popen_uci(["lc0", "--weights=maia-1500.pb.gz"])
-    engine.configure({"Threads": 1})
+    engine.configure({"Threads": 4})
+
+    stockfish_engine = chess.engine.SimpleEngine.popen_uci(
+        "/opt/homebrew/bin/stockfish"
+    )
 
     best_moves = get_best_moves(engine, board)
 
@@ -329,6 +362,8 @@ def main():
         draw_restart_button()
         draw_input_box()
         draw_make_move_button()
+        win_prob, draw_prob, loss_prob = evaluate_position(stockfish_engine, board)
+        draw_probabilities(win_prob, draw_prob, loss_prob)
         pygame.display.update()
 
     def draw_undo_button():
@@ -400,6 +435,7 @@ def main():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 engine.quit()
+                stockfish_engine.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 show_menu = not show_menu
@@ -463,6 +499,7 @@ def main():
 
         clock.tick(30)
 
+    stockfish_engine.quit()
     engine.quit()
 
 
