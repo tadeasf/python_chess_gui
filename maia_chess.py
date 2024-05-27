@@ -279,7 +279,7 @@ def main():
 
     best_moves = get_best_moves(engine, board)
 
-    input_box = pygame.Rect(WIDTH // 2 - 75, HEIGHT - INFO_HEIGHT + 70, 150, 30)
+    input_box = pygame.Rect(WIDTH // 2 - 125, HEIGHT - INFO_HEIGHT + 100, 150, 30)
     color_inactive = pygame.Color("lightskyblue3")
     color_active = pygame.Color("dodgerblue2")
     color = color_inactive
@@ -333,11 +333,11 @@ def main():
         pygame.draw.rect(WINDOW, color, input_box, 2)
         text_surface = font.render(text, True, color)
         WINDOW.blit(text_surface, (input_box.x + 5, input_box.y + 5))
-        input_box.w = max(150, text_surface.get_width() + 5)
+        input_box.w = max(250, text_surface.get_width() + 5)
 
     def draw_make_move_button():
         make_move_button = pygame.Rect(
-            WIDTH // 2 - 75, HEIGHT - INFO_HEIGHT + 110, 150, 40
+            WIDTH // 2 - 75, HEIGHT - INFO_HEIGHT + 140, 150, 40
         )
         pygame.draw.rect(WINDOW, pygame.Color(0, 128, 0), make_move_button)
         font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
@@ -370,7 +370,7 @@ def main():
                 board.push(move)
                 move_history.append(move)
                 return True
-        except Exception:
+        except:
             return False
         return False
 
