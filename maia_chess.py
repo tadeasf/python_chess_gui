@@ -61,27 +61,104 @@ LEGAL_MOVE_COLOR = pygame.Color(255, 255, 102, 128)  # Light Yellow
 SELECTED_SQUARE_COLOR = pygame.Color(255, 0, 0, 128)  # Semi-transparent Red
 
 
+# New Tile class
+class Square:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.abs_x = x * width
+        self.abs_y = y * height
+        self.abs_pos = (self.abs_x, self.abs_y)
+        self.pos = (x, y)
+        self.color = "light" if (x + y) % 2 == 0 else "dark"
+        self.draw_color = (220, 208, 194) if self.color == "light" else (53, 53, 53)
+        self.highlight_color = (100, 249, 83) if self.color == "light" else (0, 228, 10)
+        self.occupying_piece = None
+        self.coord = self.get_coord()
+        self.highlight = False
+        self.rect = pygame.Rect(self.abs_x, self.abs_y, self.width, self.height)
+
+    def get_coord(self):
+        columns = "abcdefgh"
+        return columns[self.x] + str(self.y + 1)
+
+    def draw(self, display):
+        if self.highlight:
+            pygame.draw.rect(display, self.highlight_color, self.rect)
+        else:
+            pygame.draw.rect(display, self.draw_color, self.rect)
+        if self.occupying_piece is not None:
+            centering_rect = self.occupying_piece.img.get_rect()
+            centering_rect.center = self.rect.center
+            display.blit(self.occupying_piece.img, centering_rect.topleft)
+
+
+# New Board class
+class Board:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.tile_width = width // 8
+        self.tile_height = height // 8
+        self.selected_piece = None
+        self.turn = "white"
+        self.config = [
+            ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
+            ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
+            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
+        ]
+        self.squares = self.generate_squares()
+        self.setup_board()
+
+    def generate_squares(self):
+        output = []
+        for y in range(8):
+            for x in range(8):
+                output.append(Square(x, y, self.tile_width, self.tile_height))
+        return output
+
+    def get_square_from_pos(self, pos):
+        for square in self.squares:
+            if (square.x, square.y) == (pos[0], pos[1]):
+                return square
+
+    def get_piece_from_pos(self, pos):
+        return self.get_square_from_pos(pos).occupying_piece
+
+    def setup_board(self):
+        for y, row in enumerate(self.config):
+            for x, piece in enumerate(row):
+                if piece != "":
+                    square = self.get_square_from_pos((x, y))
+                    piece_image = IMAGES[piece]
+                    square.occupying_piece = piece_image
+
+    def draw(self, display):
+        for square in self.squares:
+            square.draw(display)
+
+
 # Draw the board
 def draw_board():
-    colors = [pygame.Color(118, 150, 86), pygame.Color(238, 238, 210)]
-    for r in range(8):
-        for c in range(8):
-            color = colors[(r + c) % 2]
-            pygame.draw.rect(
-                WINDOW, color, pygame.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE)
-            )
+    global game_board
+    game_board.draw(WINDOW)
 
 
 # Draw pieces
 def draw_pieces(board):
-    for r in range(8):
-        for c in range(8):
-            piece = board.piece_at(chess.square(c, 7 - r))
-            if piece:
-                piece_image = IMAGES[piece_to_image[piece.symbol()]]
-                WINDOW.blit(
-                    piece_image, pygame.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE)
-                )
+    for square in game_board.squares:
+        piece = board.piece_at(chess.square(square.x, 7 - square.y))
+        if piece:
+            piece_image = IMAGES[piece_to_image[piece.symbol()]]
+            square.occupying_piece = piece_image
+            WINDOW.blit(piece_image, square.rect)
 
 
 def highlight_selected_square(window, selected_square):
@@ -89,9 +166,6 @@ def highlight_selected_square(window, selected_square):
         x, y = (
             chess.square_file(selected_square),
             7 - chess.square_rank(selected_square),  # Invert y-coordinate here
-        )
-        print(
-            f"Highlighting selected square {chess.square_name(selected_square)} at ({x}, {y})"
         )
         pygame.draw.rect(
             window,
@@ -141,35 +215,21 @@ def draw_arrows(window, best_moves):
 # Handle user input
 def get_square_under_mouse():
     mouse_pos = pygame.mouse.get_pos()
-
-    # Hardcoded a1 square detection
-    if 0 <= mouse_pos[0] < SQ_SIZE and (HEIGHT - SQ_SIZE) <= mouse_pos[1] < HEIGHT:
-        print(f"Clicked on a1 (Mouse position: {mouse_pos})")
-        return chess.square(0, 7)  # Return the square at (0, 7) for a1
-
-    # Normal square detection for other squares
     x, y = [int(v // SQ_SIZE) for v in mouse_pos]
     flipped_y = 7 - y
-    print(f"Mouse position: {mouse_pos}")  # Add debug output
-    print(f"Calculated coordinates: {x}, {flipped_y}")  # Debug output
     if 0 <= x < 8 and 0 <= flipped_y < 8:
         square = chess.square(x, flipped_y)
-        print(f"Calculated square: {chess.square_name(square)}")  # Debug output
         return square
-
     return None
 
 
 def set_engine_parameters(engine, elo_rating):
-    # Determine the Maia model to use based on the selected Elo rating
     if elo_rating < 1100 or elo_rating > 1900 or elo_rating % 100 != 0:
         raise ValueError(
             "Invalid Elo rating. Please choose a rating between 1100 and 1900 in increments of 100."
         )
 
     weights = f"maia-{elo_rating}.pb.gz"
-
-    # Set up the engine with the selected weights
     engine.quit()
     engine = chess.engine.SimpleEngine.popen_uci(
         [
@@ -177,7 +237,6 @@ def set_engine_parameters(engine, elo_rating):
             f"--weights=/Volumes/nvme/PROJECTS/coding_projects/python_chess_gui/{weights}",
         ]
     )
-    # Send the command to limit nodes to 1
     engine.configure({"Threads": 1})
     return engine
 
@@ -245,6 +304,7 @@ def elo_menu(window, current_elo):
 
 
 def main():
+    global game_board
     board = chess.Board()
     clock = pygame.time.Clock()
 
@@ -253,6 +313,9 @@ def main():
     last_move = None
     elo_rating = 1500
     show_menu = False
+
+    # Initialize the game board
+    game_board = Board(BOARD_SIZE, BOARD_SIZE)
 
     # Move history for undo functionality
     move_history = []
@@ -264,7 +327,6 @@ def main():
             "--weights=/Volumes/nvme/PROJECTS/coding_projects/python_chess_gui/maia-1500.pb.gz",
         ]
     )
-    # Send the command to limit nodes to 1
     engine.configure({"Threads": 1})
 
     best_moves = get_best_moves(engine, board)
@@ -303,7 +365,6 @@ def main():
         WINDOW.blit(text_surface, (BOARD_SIZE + 160, HEIGHT - 50))
         return restart_button
 
-    # Initial drawing
     redraw_all()
 
     while not board.is_game_over():
@@ -343,7 +404,6 @@ def main():
                         else:
                             player_clicks.append(square)
                             move = chess.Move(player_clicks[0], player_clicks[1])
-                            print(f"Attempting move: {move}")  # Debug output
                             if move in board.legal_moves:
                                 board.push(move)
                                 move_history.append(move)
@@ -356,17 +416,8 @@ def main():
                                 player_clicks = [square]
                                 selected_square = square
 
-                        if selected_square is not None:
-                            print(
-                                f"Selected square set to: {chess.square_name(selected_square)}"
-                            )
-                        else:
-                            print("Selected square set to: None")
-
         if not show_menu:
-            # Redraw the specific parts of the screen as needed
             redraw_all()
-
         clock.tick(30)
 
     engine.quit()
