@@ -59,8 +59,8 @@ ARROW_COLORS = [
     pygame.Color(173, 216, 230, 128),  # Light Blue
     pygame.Color(144, 238, 144, 128),  # Light Green
 ]
-LEGAL_MOVE_COLOR = pygame.Color(255, 255, 102, 128)  # Light Yellow
-SELECTED_SQUARE_COLOR = pygame.Color(255, 0, 0, 128)  # Semi-transparent Red
+LEGAL_MOVE_COLOR = pygame.Color(149, 149, 149, 128)
+SELECTED_SQUARE_COLOR = pygame.Color(255, 109, 97, 128)
 
 
 # Draw the board
@@ -237,10 +237,10 @@ def get_best_moves(engine, board, num_moves=3):
 
 def elo_menu(window, current_elo):
     menu_running = True
-    font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 36)
-    button_width = 100
-    button_height = 50
-    button_spacing = 20
+    font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 20)
+    button_width = 150
+    button_height = 75
+    button_spacing = 25
     buttons = []
 
     for i, elo in enumerate(range(1100, 2000, 100)):
@@ -321,7 +321,7 @@ def main():
 
     # Initialize the Maia engine with the default Elo rating
     engine = chess.engine.SimpleEngine.popen_uci(["lc0", "--weights=maia-1500.pb.gz"])
-    engine.configure({"Threads": 4})
+    engine.configure({"Threads": 2})
 
     stockfish_engine = chess.engine.SimpleEngine.popen_uci(
         "/opt/homebrew/bin/stockfish"
