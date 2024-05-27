@@ -74,6 +74,23 @@ def draw_board():
             )
 
 
+def draw_coordinates():
+    font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 18)
+    for i in range(8):
+        # Draw files (a-h) at the bottom of the board, aligned to the bottom-right of each square
+        file_label = font.render(chr(97 + i), True, pygame.Color(0, 0, 0))
+        WINDOW.blit(
+            file_label,
+            (
+                (i + 1) * SQ_SIZE - file_label.get_width() - 2,
+                BOARD_SIZE - file_label.get_height() - 2,
+            ),
+        )
+        # Draw ranks (1-8) on the left side of the board, aligned to the top-left of each square
+        rank_label = font.render(str(8 - i), True, pygame.Color(0, 0, 0))
+        WINDOW.blit(rank_label, (5, i * SQ_SIZE + 5))
+
+
 # Draw pieces
 def draw_pieces(board):
     for r in range(8):
@@ -292,6 +309,7 @@ def main():
         highlight_selected_square(WINDOW, selected_square)
         highlight_legal_moves(WINDOW, board, selected_square)
         draw_pieces(board)
+        draw_coordinates()
         if last_move:
             draw_move_arrow(WINDOW, last_move.from_square, last_move.to_square)
         draw_arrows(WINDOW, best_moves)
@@ -370,7 +388,7 @@ def main():
                 board.push(move)
                 move_history.append(move)
                 return True
-        except:
+        except Exception:
             return False
         return False
 
