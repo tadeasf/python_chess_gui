@@ -29,15 +29,15 @@ def resource_path(relative_path):
 
 # Load images
 IMAGES = {}
-PIECES = ["wp", "bp", "wN", "bN", "wB", "bB", "wR", "bR", "wQ", "bQ", "wK", "bK"]
+PIECES = ["wP", "bP", "wN", "bN", "wB", "bB", "wR", "bR", "wQ", "bQ", "wK", "bK"]
 for piece in PIECES:
     image = pygame.image.load(resource_path(f"images/{piece}.png"))
     IMAGES[piece] = pygame.transform.smoothscale(image, (SQ_SIZE, SQ_SIZE))
 
 # Piece to image mapping
 piece_to_image = {
-    "P": "wp",
-    "p": "bp",
+    "P": "wP",
+    "p": "bP",
     "N": "wN",
     "n": "bN",
     "B": "wB",
@@ -86,16 +86,13 @@ def draw_pieces(board):
 
 def highlight_selected_square(window, selected_square):
     if selected_square is not None:
-        file = chess.square_file(selected_square)
-        rank = chess.square_rank(selected_square)
-        x = file
-        y = 7 - rank  # Flip the rank to match Pygame's coordinate system
-
-        print(
-            f"Highlighting selected square {chess.square_name(selected_square)}"
-            f" (file: {file}, rank: {rank}) at (x: {x}, y: {y})"
+        x, y = (
+            chess.square_file(selected_square),
+            7 - chess.square_rank(selected_square),  # Invert y-coordinate here
         )
-
+        print(
+            f"Highlighting selected square {chess.square_name(selected_square)} at ({x}, {y})"
+        )
         pygame.draw.rect(
             window,
             SELECTED_SQUARE_COLOR,
@@ -143,14 +140,23 @@ def draw_arrows(window, best_moves):
 
 # Handle user input
 def get_square_under_mouse():
-    mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
+    mouse_pos = pygame.mouse.get_pos()
+
+    # Hardcoded a1 square detection
+    if 0 <= mouse_pos[0] < SQ_SIZE and (HEIGHT - SQ_SIZE) <= mouse_pos[1] < HEIGHT:
+        print(f"Clicked on a1 (Mouse position: {mouse_pos})")
+        return chess.square(0, 7)  # Return the square at (0, 7) for a1
+
+    # Normal square detection for other squares
     x, y = [int(v // SQ_SIZE) for v in mouse_pos]
-    flipped_y = 7 - y  # Correctly flipping the y-coordinate
+    flipped_y = 7 - y
+    print(f"Mouse position: {mouse_pos}")  # Add debug output
     print(f"Calculated coordinates: {x}, {flipped_y}")  # Debug output
-    if 0 <= x < 8 and 0 <= flipped_y < 8:  # Check flipped_y instead of y
+    if 0 <= x < 8 and 0 <= flipped_y < 8:
         square = chess.square(x, flipped_y)
         print(f"Calculated square: {chess.square_name(square)}")  # Debug output
         return square
+
     return None
 
 
