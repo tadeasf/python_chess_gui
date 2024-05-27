@@ -20,14 +20,19 @@ WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Fořtí Chess Engine")
 
 
-# Determine the resource path
 def resource_path(relative_path):
+    """Get the absolute path to a resource, works for dev and for PyInstaller/Nuitka"""
     try:
+        # PyInstaller/Nuitka creates a temp folder and stores the path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
+
     return os.path.join(base_path, relative_path)
 
+
+font = pygame.font.Font(resource_path("assets/fonts/IosevkaSlab-Regular.ttf"), 24)
+font = pygame.font.Font(resource_path("assets/fonts/IosevkaSlab-Regular.ttf"), 36)
 
 # Load images
 IMAGES = {}
@@ -206,7 +211,7 @@ def set_engine_parameters(engine, elo_rating):
         raise ValueError(
             "Invalid Elo rating. Please choose a rating between 1100 and 1900 in increments of 100."
         )
-    weights = f"maia-{elo_rating}.pb.gz"
+    weights = f"assets/models/maia-{elo_rating}.pb.gz"
     engine.quit()
     engine = chess.engine.SimpleEngine.popen_uci(["lc0", f"--weights={weights}"])
     engine.configure({"Threads": 1})
@@ -281,14 +286,20 @@ def evaluate_position(engine, board):
     info = engine.analyse(board, chess.engine.Limit(time=0.1))
     score = info["score"].relative.score(mate_score=10000)
     if score is None:
+        print("Evaluation score is None")
         return 0.5, 0.5, 0.0  # In case of an unknown score
+    print(f"Evaluation score: {score}")
     win_prob = 1 / (1 + math.exp(-score / 400))
     loss_prob = 1 - win_prob
     draw_prob = 0.0  # For simplicity, you can refine this if needed
+    print(
+        f"Probabilities - Win: {win_prob:.2%}, Draw: {draw_prob:.2%}, Lose: {loss_prob:.2%}"
+    )
     return win_prob, draw_prob, loss_prob
 
 
 def draw_probabilities(win_prob, draw_prob, loss_prob):
+    print("Drawing probabilities...")
     font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
     text_y = HEIGHT - INFO_HEIGHT + 200
     text_x = WIDTH - 250
@@ -320,7 +331,12 @@ def main():
     move_history = []
 
     # Initialize the Maia engine with the default Elo rating
-    engine = chess.engine.SimpleEngine.popen_uci(["lc0", "--weights=maia-1500.pb.gz"])
+    engine = chess.engine.SimpleEngine.popen_uci(
+        [
+            "lc0",
+            "--weights=assets/models/maia-1500.pb.gz",
+        ]
+    )
     engine.configure({"Threads": 2})
 
     stockfish_engine = chess.engine.SimpleEngine.popen_uci(
@@ -369,7 +385,9 @@ def main():
     def draw_undo_button():
         undo_button = pygame.Rect(10, HEIGHT - INFO_HEIGHT + 10, 175, 60)
         pygame.draw.rect(WINDOW, pygame.Color(255, 0, 0), undo_button)
-        font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 36)
+        font = pygame.font.Font(
+            resource_path("assets/fonts/IosevkaSlab-Regular.ttf"), 36
+        )
         text_surface = font.render("Undo Move", True, pygame.Color(255, 255, 255))
         WINDOW.blit(text_surface, (undo_button.x + 5, undo_button.y + 5))
         return undo_button
@@ -377,7 +395,9 @@ def main():
     def draw_restart_button():
         restart_button = pygame.Rect(WIDTH - 170, HEIGHT - INFO_HEIGHT + 10, 150, 60)
         pygame.draw.rect(WINDOW, pygame.Color(0, 0, 255), restart_button)
-        font = font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 36)
+        font = pygame.font.Font(
+            resource_path("assets/fonts/IosevkaSlab-Regular.ttf"), 36
+        )
         text_surface = font.render("Restart", True, pygame.Color(255, 255, 255))
         WINDOW.blit(text_surface, (restart_button.x + 5, restart_button.y + 5))
         return restart_button
@@ -393,7 +413,9 @@ def main():
             WIDTH // 2 - 75, HEIGHT - INFO_HEIGHT + 140, 150, 40
         )
         pygame.draw.rect(WINDOW, pygame.Color(0, 128, 0), make_move_button)
-        font = pygame.font.Font("assets/fonts/IosevkaSlab-Regular.ttf", 24)
+        font = pygame.font.Font(
+            resource_path("assets/fonts/IosevkaSlab-Regular.ttf"), 24
+        )
         text_surface = font.render("Make Move", True, pygame.Color(255, 255, 255))
         WINDOW.blit(text_surface, (make_move_button.x + 20, make_move_button.y + 5))
         return make_move_button
