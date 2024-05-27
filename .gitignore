@@ -1,0 +1,5 @@
+build
+dist
+*.pb.gz
+main.spec
+maia_chess.spec
